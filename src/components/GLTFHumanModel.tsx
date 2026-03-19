@@ -16,6 +16,114 @@ export interface CircleData {
 
 export type CombinedPartsMap = Record<string, { left: string; right: string }>;
 
+/**
+ * Divide BufferGeometry pelo plano x=planeX (em espaço local).
+ * Triângulos com centroid.x >= planeX → geomA, centroid.x < planeX → geomB.
+ * flipLeftRight: true = geomA é direito (_R), geomB é esquerdo (_L).
+ */
+function splitGeometryByPlaneX(
+  geometry: THREE.BufferGeometry,
+  planeX: number,
+  flipLeftRight: boolean
+): { geomL: THREE.BufferGeometry; geomR: THREE.BufferGeometry } {
+  const posAttr = geometry.getAttribute("position");
+  const indexAttr = geometry.index;
+  const hasNormals = geometry.hasAttribute("normal");
+  const normAttr = hasNormals ? geometry.getAttribute("normal") : null;
+  const hasUV = geometry.hasAttribute("uv");
+  const uvAttr = hasUV ? geometry.getAttribute("uv") : null;
+
+  const indicesL: number[] = [];
+  const indicesR: number[] = [];
+  const vertexMapL = new Map<string, number>();
+  const vertexMapR = new Map<string, number>();
+  const vertsL: { pos: [number, number, number]; norm?: [number, number, number]; uv?: [number, number] }[] = [];
+  const vertsR: { pos: [number, number, number]; norm?: [number, number, number]; uv?: [number, number] }[] = [];
+
+  const getKey = (i: number) => {
+    const x = posAttr.getX(i), y = posAttr.getY(i), z = posAttr.getZ(i);
+    return `${x.toFixed(6)},${y.toFixed(6)},${z.toFixed(6)}`;
+  };
+
+  const addVertex = (
+    i: number,
+    map: Map<string, number>,
+    arr: { pos: [number, number, number]; norm?: [number, number, number]; uv?: [number, number] }[]
+  ) => {
+    const key = getKey(i);
+    let idx = map.get(key);
+    if (idx === undefined) {
+      idx = arr.length;
+      map.set(key, idx);
+      arr.push({
+        pos: [posAttr.getX(i), posAttr.getY(i), posAttr.getZ(i)],
+        norm: normAttr ? [normAttr.getX(i), normAttr.getY(i), normAttr.getZ(i)] : undefined,
+        uv: uvAttr ? [uvAttr.getX(i), uvAttr.getY(i)] : undefined,
+      });
+    }
+    return idx;
+  };
+
+  const processTriangle = (i0: number, i1: number, i2: number) => {
+    const x0 = posAttr.getX(i0), x1 = posAttr.getX(i1), x2 = posAttr.getX(i2);
+    const cx = (x0 + x1 + x2) / 3;
+    const isRight = cx >= planeX;
+    const toL = flipLeftRight ? !isRight : isRight;
+    const map = toL ? vertexMapL : vertexMapR;
+    const arr = toL ? vertsL : vertsR;
+    const indices = toL ? indicesL : indicesR;
+    const v0 = addVertex(i0, map, arr);
+    const v1 = addVertex(i1, map, arr);
+    const v2 = addVertex(i2, map, arr);
+    indices.push(v0, v1, v2);
+  };
+
+  if (indexAttr) {
+    for (let i = 0; i < indexAttr.count; i += 3) {
+      processTriangle(
+        indexAttr.getX(i) as number,
+        indexAttr.getX(i + 1) as number,
+        indexAttr.getX(i + 2) as number
+      );
+    }
+  } else {
+    for (let i = 0; i < posAttr.count; i += 3) {
+      processTriangle(i, i + 1, i + 2);
+    }
+  }
+
+  const buildGeom = (arr: typeof vertsL) => {
+    const geom = new THREE.BufferGeometry();
+    const positions = new Float32Array(arr.length * 3);
+    const normals = hasNormals ? new Float32Array(arr.length * 3) : null;
+    const uvs = hasUV ? new Float32Array(arr.length * 2) : null;
+    for (let i = 0; i < arr.length; i++) {
+      positions[i * 3] = arr[i].pos[0];
+      positions[i * 3 + 1] = arr[i].pos[1];
+      positions[i * 3 + 2] = arr[i].pos[2];
+      if (normals && arr[i].norm) {
+        normals[i * 3] = arr[i].norm![0];
+        normals[i * 3 + 1] = arr[i].norm![1];
+        normals[i * 3 + 2] = arr[i].norm![2];
+      }
+      if (uvs && arr[i].uv) {
+        uvs[i * 2] = arr[i].uv![0];
+        uvs[i * 2 + 1] = arr[i].uv![1];
+      }
+    }
+    geom.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    if (normals) geom.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
+    if (uvs) geom.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
+    return geom;
+  };
+
+  const geomL = buildGeom(vertsL);
+  const geomR = buildGeom(vertsR);
+  geomL.setIndex(indicesL);
+  geomR.setIndex(indicesR);
+  return { geomL, geomR };
+}
+
 interface GLTFHumanModelProps {
   modelPath: string;
   selectedZone: string | null;
@@ -115,10 +223,8 @@ export function GLTFHumanModel({
       }
     });
 
-    // Divide meshes combinados em malhas separadas L e R (clipping planes em world x=0)
-    // glTF: +X = esquerda, -X = direita (personagem de frente, +Z para câmera)
-    const planeLeft = new THREE.Plane(new THREE.Vector3(1, 0, 0), 0);   // visível: x > 0 (esquerdo)
-    const planeRight = new THREE.Plane(new THREE.Vector3(-1, 0, 0), 0); // visível: x < 0 (direito)
+    // Divide meshes combinados em geometrias L e R (split por triângulos, sem clipping)
+    // Evita sobreposição: cada triângulo vai para apenas uma malha
     for (const mesh of toSplit) {
       const baseName = mesh.name;
       const parent = mesh.parent;
@@ -132,20 +238,10 @@ export function GLTFHumanModel({
         return c;
       };
 
-      const geomL = mesh.geometry.clone();
-      const geomR = mesh.geometry.clone();
+      const { geomL, geomR } = splitGeometryByPlaneX(mesh.geometry, 0, flipLeftRightAxis);
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       const matL = mats.length === 1 ? cloneMat(mats[0]) : mats.map(cloneMat);
       const matR = mats.length === 1 ? cloneMat(mats[0]) : mats.map(cloneMat);
-
-      const setClip = (m: THREE.Material, plane: THREE.Plane) => {
-        (m as THREE.MeshStandardMaterial).clippingPlanes = [plane];
-      };
-      // glTF: +X=esquerda, -X=direita. Se flipLeftRightAxis: modelo usa convenção oposta
-      const planeForL = flipLeftRightAxis ? planeRight : planeLeft;
-      const planeForR = flipLeftRightAxis ? planeLeft : planeRight;
-      if (Array.isArray(matL)) matL.forEach(m => setClip(m, planeForL)); else setClip(matL, planeForL);
-      if (Array.isArray(matR)) matR.forEach(m => setClip(m, planeForR)); else setClip(matR, planeForR);
 
       const meshL = new THREE.Mesh(geomL, matL);
       const meshR = new THREE.Mesh(geomR, matR);
@@ -192,16 +288,28 @@ export function GLTFHumanModel({
     const size = combinedBox.getSize(new THREE.Vector3());
     const meshSize = Math.max(size.x, size.y, size.z);
 
-    // Direction: camera faces the region (from outside toward center)
+    // Direction: câmera fica fora da região, olhando para ela
+    // glTF: +Z = frente. Partes traseiras (Costas, Lombar, Glúteos) → câmera atrás. Demais → frente.
+    const BACK_ZONES = ["Costas", "Dorso Superior", "Dorso Inferior", "Lombar", "Glúteos"];
+    const isBackZone = BACK_ZONES.includes(selectedZone);
+
     const modelBox = new THREE.Box3().setFromObject(modelScene);
     const modelCenter = modelBox.getCenter(new THREE.Vector3());
-    const dir = new THREE.Vector3(
+    let dir = new THREE.Vector3(
       center.x - modelCenter.x,
       0,
       center.z - modelCenter.z
     );
-    if (dir.length() < 0.01) dir.set(0, 0, 1);
-    dir.normalize();
+    if (dir.length() < 0.01) {
+      dir.set(0, 0, isBackZone ? -1 : 1);
+    } else {
+      dir.normalize();
+      // Coxa, pernas etc.: centro pode estar atrás (z<0). Forçar câmera na frente.
+      if (!isBackZone && dir.z < 0) {
+        dir.set(dir.x, 0, Math.abs(dir.z) || 0.3);
+        dir.normalize();
+      }
+    }
 
     onMeshCenterFound(center, meshName, dir, meshSize, size);
   }, [selectedZone, modelScene, reverseMap, getDisplayName, combinedParts, onMeshCenterFound]);
