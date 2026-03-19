@@ -29,6 +29,8 @@ interface GLTFHumanModelProps {
   onResizeCircle?: (radius: number) => void;
   onFinishCircle?: () => void;
   onMeshCenterFound?: (center: THREE.Vector3, meshName: string, direction: THREE.Vector3, meshSize?: number, bboxSize?: THREE.Vector3) => void;
+  /** Se true, inverte L/R (para modelos com convenção oposta ao glTF) */
+  flipLeftRightAxis?: boolean;
 }
 
 export function GLTFHumanModel({
@@ -44,6 +46,7 @@ export function GLTFHumanModel({
   onResizeCircle,
   onFinishCircle,
   onMeshCenterFound,
+  flipLeftRightAxis = false,
 }: GLTFHumanModelProps) {
   const gltf = useLoader(GLTFLoader, modelPath, (loader) => {
     const dracoLoader = new DRACOLoader();
@@ -113,8 +116,9 @@ export function GLTFHumanModel({
     });
 
     // Divide meshes combinados em malhas separadas L e R (clipping planes em world x=0)
-    const planeL = new THREE.Plane(new THREE.Vector3(-1, 0, 0), 0); // visível: x < 0 (esquerdo)
-    const planeR = new THREE.Plane(new THREE.Vector3(1, 0, 0), 0);  // visível: x > 0 (direito)
+    // glTF: +X = esquerda, -X = direita (personagem de frente, +Z para câmera)
+    const planeLeft = new THREE.Plane(new THREE.Vector3(1, 0, 0), 0);   // visível: x > 0 (esquerdo)
+    const planeRight = new THREE.Plane(new THREE.Vector3(-1, 0, 0), 0); // visível: x < 0 (direito)
     for (const mesh of toSplit) {
       const baseName = mesh.name;
       const parent = mesh.parent;
@@ -137,8 +141,11 @@ export function GLTFHumanModel({
       const setClip = (m: THREE.Material, plane: THREE.Plane) => {
         (m as THREE.MeshStandardMaterial).clippingPlanes = [plane];
       };
-      if (Array.isArray(matL)) matL.forEach(m => setClip(m, planeL)); else setClip(matL, planeL);
-      if (Array.isArray(matR)) matR.forEach(m => setClip(m, planeR)); else setClip(matR, planeR);
+      // glTF: +X=esquerda, -X=direita. Se flipLeftRightAxis: modelo usa convenção oposta
+      const planeForL = flipLeftRightAxis ? planeRight : planeLeft;
+      const planeForR = flipLeftRightAxis ? planeLeft : planeRight;
+      if (Array.isArray(matL)) matL.forEach(m => setClip(m, planeForL)); else setClip(matL, planeForL);
+      if (Array.isArray(matR)) matR.forEach(m => setClip(m, planeForR)); else setClip(matR, planeForR);
 
       const meshL = new THREE.Mesh(geomL, matL);
       const meshR = new THREE.Mesh(geomR, matR);
@@ -160,7 +167,7 @@ export function GLTFHumanModel({
     }
 
     return scene;
-  }, [gltf.scene, combinedParts]);
+  }, [gltf.scene, combinedParts, flipLeftRightAxis]);
 
   useEffect(() => {
     if (!selectedZone || !modelScene || !onMeshCenterFound) return;

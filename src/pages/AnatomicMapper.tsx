@@ -249,6 +249,7 @@ export default function AnatomicMapper() {
                     onResizeCircle={handleResizeCircle}
                     onFinishCircle={handleFinishCircle}
                     onMeshCenterFound={handleMeshCenterFound}
+                    flipLeftRightAxis={true}
                   />
                   <ContactShadows opacity={0.2} scale={10} blur={2.5} far={2} position={[0, -0.1, 0]} />
                   <Environment preset="studio" />

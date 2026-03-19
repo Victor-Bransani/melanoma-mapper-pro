@@ -5,12 +5,7 @@ interface HumanoidModelProps {
   onSelectZone: (name: string) => void;
 }
 
-/**
- * Manequim 3D placeholder com proporções humanas realistas.
- * 
- * Quando você tiver um modelo .glb real, substitua este componente
- * pelo <GLTFHumanModel /> — veja src/components/GLTFHumanModel.tsx
- */
+
 export function HumanoidPlaceholder({ selectedZone, onSelectZone }: HumanoidModelProps) {
   const isActive = (name: string) => selectedZone === name;
 
