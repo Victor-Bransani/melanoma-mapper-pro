@@ -5,13 +5,11 @@ interface HumanoidModelProps {
   onSelectZone: (name: string) => void;
 }
 
-
 export function HumanoidPlaceholder({ selectedZone, onSelectZone }: HumanoidModelProps) {
   const isActive = (name: string) => selectedZone === name;
 
   return (
     <group position={[0, -0.3, 0]} scale={1.0}>
-      {/* ===== CABEÇA ===== */}
       <BodyPartMesh
         name="Cabeça"
         position={[0, 2.55, 0]}
@@ -21,7 +19,6 @@ export function HumanoidPlaceholder({ selectedZone, onSelectZone }: HumanoidMode
         active={isActive("Cabeça")}
       />
 
-      {/* ===== PESCOÇO ===== */}
       <BodyPartMesh
         name="Pescoço"
         position={[0, 2.15, 0]}
@@ -31,7 +28,6 @@ export function HumanoidPlaceholder({ selectedZone, onSelectZone }: HumanoidMode
         active={isActive("Pescoço")}
       />
 
-      {/* ===== TÓRAX ===== */}
       <BodyPartMesh
         name="Tórax"
         position={[0, 1.65, 0]}
@@ -42,7 +38,6 @@ export function HumanoidPlaceholder({ selectedZone, onSelectZone }: HumanoidMode
         scale={[1, 1, 0.55]}
       />
 
-      {/* ===== ABDÔMEN ===== */}
       <BodyPartMesh
         name="Abdômen"
         position={[0, 1.05, 0]}
@@ -53,7 +48,6 @@ export function HumanoidPlaceholder({ selectedZone, onSelectZone }: HumanoidMode
         scale={[1, 1, 0.5]}
       />
 
-      {/* ===== OMBROS ===== */}
       <BodyPartMesh
         name="Ombro Direito"
         position={[-0.5, 1.92, 0]}
@@ -71,7 +65,6 @@ export function HumanoidPlaceholder({ selectedZone, onSelectZone }: HumanoidMode
         active={isActive("Ombro Esquerdo")}
       />
 
-      {/* ===== BRAÇOS ===== */}
       <BodyPartMesh
         name="Braço Direito"
         position={[-0.58, 1.6, 0]}
@@ -89,7 +82,6 @@ export function HumanoidPlaceholder({ selectedZone, onSelectZone }: HumanoidMode
         active={isActive("Braço Esquerdo")}
       />
 
-      {/* ===== COTOVELOS ===== */}
       <BodyPartMesh
         name="Cotovelo Direito"
         position={[-0.6, 1.35, 0]}
@@ -107,7 +99,6 @@ export function HumanoidPlaceholder({ selectedZone, onSelectZone }: HumanoidMode
         active={isActive("Cotovelo Esquerdo")}
       />
 
-      {/* ===== ANTEBRAÇOS ===== */}
       <BodyPartMesh
         name="Antebraço Direito"
         position={[-0.62, 1.08, 0]}
@@ -125,7 +116,6 @@ export function HumanoidPlaceholder({ selectedZone, onSelectZone }: HumanoidMode
         active={isActive("Antebraço Esquerdo")}
       />
 
-      {/* ===== MÃOS ===== */}
       <BodyPartMesh
         name="Mão Direita"
         position={[-0.64, 0.82, 0]}
@@ -145,7 +135,6 @@ export function HumanoidPlaceholder({ selectedZone, onSelectZone }: HumanoidMode
         scale={[1, 1, 0.5]}
       />
 
-      {/* ===== QUADRIL / PELVE ===== */}
       <BodyPartMesh
         name="Quadril"
         position={[0, 0.72, 0]}
@@ -156,7 +145,6 @@ export function HumanoidPlaceholder({ selectedZone, onSelectZone }: HumanoidMode
         scale={[1, 1, 0.45]}
       />
 
-      {/* ===== COXAS ===== */}
       <BodyPartMesh
         name="Coxa Direita"
         position={[-0.15, 0.3, 0]}
@@ -174,7 +162,6 @@ export function HumanoidPlaceholder({ selectedZone, onSelectZone }: HumanoidMode
         active={isActive("Coxa Esquerda")}
       />
 
-      {/* ===== JOELHOS ===== */}
       <BodyPartMesh
         name="Joelho Direito"
         position={[-0.15, -0.03, 0]}
@@ -192,7 +179,6 @@ export function HumanoidPlaceholder({ selectedZone, onSelectZone }: HumanoidMode
         active={isActive("Joelho Esquerdo")}
       />
 
-      {/* ===== PANTURRILHAS ===== */}
       <BodyPartMesh
         name="Panturrilha Direita"
         position={[-0.15, -0.4, 0]}
@@ -210,7 +196,6 @@ export function HumanoidPlaceholder({ selectedZone, onSelectZone }: HumanoidMode
         active={isActive("Panturrilha Esquerda")}
       />
 
-      {/* ===== TORNOZELOS ===== */}
       <BodyPartMesh
         name="Tornozelo Direito"
         position={[-0.15, -0.7, 0]}
@@ -228,7 +213,6 @@ export function HumanoidPlaceholder({ selectedZone, onSelectZone }: HumanoidMode
         active={isActive("Tornozelo Esquerdo")}
       />
 
-      {/* ===== PÉS ===== */}
       <BodyPartMesh
         name="Pé Direito"
         position={[-0.15, -0.82, 0.04]}

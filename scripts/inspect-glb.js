@@ -1,11 +1,4 @@
-/**
- * Node.js script to inspect human-body.glb:
- * - Mesh names and hierarchy
- * - For COMBINED_PARTS: world-space bbox, vertex min/max X,Z
- * - Whether model uses X or Z for left/right separation
- *
- * Run: node scripts/inspect-glb.js
- */
+/* Inspeciona public/models/human-body.glb: árvore de nós, bbox por mesh COMBINED_PARTS, eixo L/R (X vs Z). */
 
 import { NodeIO } from "@gltf-transform/core";
 import { KHRDracoMeshCompression } from "@gltf-transform/extensions";
@@ -34,7 +27,6 @@ const COMBINED_PARTS = [
   "SA_03_EARS",
 ];
 
-/** Transform a vec3 by a mat4 (column-major). */
 function transformPoint(m, x, y, z) {
   const w = m[3] * x + m[7] * y + m[11] * z + m[15];
   return [
@@ -101,7 +93,6 @@ async function loadAndInspect() {
     traverseWithHierarchy(node);
   }
 
-  // Build name -> nodes map (match by node name; meshes may be unnamed)
   const nameToNodes = new Map();
   defaultScene.traverse((node) => {
     const mesh = node.getMesh();
@@ -123,7 +114,6 @@ async function loadAndInspect() {
       continue;
     }
 
-    // Use first node (combined parts typically have one node with the full mesh)
     const node = nodes[0];
     const mesh = node.getMesh();
     const worldMatrix = node.getWorldMatrix();
@@ -147,7 +137,6 @@ async function loadAndInspect() {
         maxZ = Math.max(maxZ, v.maxZ);
       }
 
-      // Get Y from vertices for bbox
       const elem = [];
       for (let i = 0; i < posAccessor.getCount(); i++) {
         posAccessor.getElement(i, elem);

@@ -13,7 +13,6 @@ export function CircleMarker({ position, normal, radius, isActive }: CircleMarke
   const ringRef = useRef<THREE.Mesh>(null);
   const groupRef = useRef<THREE.Group>(null);
 
-  // Orient circle to face along the surface normal
   const quaternion = new THREE.Quaternion().setFromUnitVectors(
     new THREE.Vector3(0, 0, 1),
     normal.clone().normalize()
@@ -29,7 +28,6 @@ export function CircleMarker({ position, normal, radius, isActive }: CircleMarke
 
   return (
     <group ref={groupRef} position={position} quaternion={quaternion}>
-      {/* Filled circle */}
       <mesh position={[0, 0, 0.005]} renderOrder={999}>
         <circleGeometry args={[radius, 48]} />
         <meshBasicMaterial
@@ -42,7 +40,6 @@ export function CircleMarker({ position, normal, radius, isActive }: CircleMarke
         />
       </mesh>
 
-      {/* Border ring */}
       <mesh ref={ringRef} position={[0, 0, 0.006]} renderOrder={1000}>
         <ringGeometry args={[radius * 0.88, radius, 48]} />
         <meshBasicMaterial
@@ -55,7 +52,6 @@ export function CircleMarker({ position, normal, radius, isActive }: CircleMarke
         />
       </mesh>
 
-      {/* Center dot */}
       <mesh position={[0, 0, 0.007]} renderOrder={1001}>
         <circleGeometry args={[radius * 0.08, 16]} />
         <meshBasicMaterial

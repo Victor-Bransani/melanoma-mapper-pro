@@ -19,9 +19,8 @@ const anatomyTree = [
   { group: "Membros Inferiores", parts: ["Coxa Direita", "Coxa Esquerda", "Joelho Direito", "Joelho Esquerdo", "Panturrilha Direita", "Panturrilha Esquerda", "Tornozelo Direito", "Tornozelo Esquerdo", "Pé Direito", "Pé Esquerdo"] },
 ];
 
-/** Mapeamento completo: mesh name → nome de exibição. Inclui variantes L/R para todos os pares. */
+/** Nomes de mesh no GLB segmentado → rótulos clínicos (incl. variantes _L/_R). */
 const meshNameMap: Record<string, string> = {
-  // Cabeça e tronco (sem lateralidade)
   "01_Scalp": "Couro Cabeludo", "02_Face": "Face", "03_Neck": "Pescoço",
   "05_Chest": "Tórax", "06_Abdomen": "Abdômen",
   "07_Lower_abdomen": "Baixo Ventre", "08_Intimate_area": "Região Íntima",
@@ -31,44 +30,33 @@ const meshNameMap: Record<string, string> = {
   "SA_08_NOSE": "Nariz", "SA_09_NOSTRILS": "Narinas", "SA_10_CHEEKS": "Bochechas",
   "SA_11_MOUTH": "Boca", "SA_12_LIPS": "Lábios", "SA_13_JAW": "Mandíbula",
   "Model": "Corpo",
-  // Ombros (L/R)
   "04_Shoulders": "Ombros", "04_Shoulders_L": "Ombro Esquerdo", "04_Shoulders_R": "Ombro Direito",
   "04_Shoulder_L": "Ombro Esquerdo", "04_Shoulder_R": "Ombro Direito",
-  // Braços (L/R) - múltiplas convenções
   "10_Upper_arms": "Braços", "10_Upper_arms_L": "Braço Esquerdo", "10_Upper_arms_R": "Braço Direito",
   "10_Upper_arm_L": "Braço Esquerdo", "10_Upper_arm_R": "Braço Direito",
-  // Cotovelos (L/R)
   "11_Elbows": "Cotovelos", "11_Elbows_L": "Cotovelo Esquerdo", "11_Elbows_R": "Cotovelo Direito",
   "11_Elbow_L": "Cotovelo Esquerdo", "11_Elbow_R": "Cotovelo Direito",
-  // Antebraços (L/R)
   "12_Fore_arms": "Antebraços", "12_Fore_arms_L": "Antebraço Esquerdo", "12_Fore_arms_R": "Antebraço Direito",
   "12_Fore_arm_L": "Antebraço Esquerdo", "12_Fore_arm_R": "Antebraço Direito",
-  // Mãos (L/R)
   "13_Hand_back": "Dorso das Mãos", "13_Hand_back_L": "Mão Esquerda", "13_Hand_back_R": "Mão Direita",
   "14_Hand_palms": "Palmas das Mãos", "14_Hand_palms_L": "Mão Esquerda", "14_Hand_palms_R": "Mão Direita",
   "13_Hand_L": "Mão Esquerda", "13_Hand_R": "Mão Direita", "14_Hand_palm_L": "Mão Esquerda", "14_Hand_palm_R": "Mão Direita",
-  // Coxas (L/R)
   "15_Thighs": "Coxas", "15_Thighs_L": "Coxa Esquerda", "15_Thighs_R": "Coxa Direita",
   "15_Thigh_L": "Coxa Esquerda", "15_Thigh_R": "Coxa Direita",
-  // Joelhos (L/R)
   "16_Knees": "Joelhos", "16_Knees_L": "Joelho Esquerdo", "16_Knees_R": "Joelho Direito",
   "16_Knee_L": "Joelho Esquerdo", "16_Knee_R": "Joelho Direito",
-  // Panturrilhas (L/R)
   "17_Legs": "Panturrilhas", "17_Legs_L": "Panturrilha Esquerda", "17_Legs_R": "Panturrilha Direita",
   "17_Leg_L": "Panturrilha Esquerda", "17_Leg_R": "Panturrilha Direita",
   "17_Calf_L": "Panturrilha Esquerda", "17_Calf_R": "Panturrilha Direita",
-  // Tornozelos (L/R)
   "18_Ankles": "Tornozelos", "18_Ankles_L": "Tornozelo Esquerdo", "18_Ankles_R": "Tornozelo Direito",
   "18_Ankle_L": "Tornozelo Esquerdo", "18_Ankle_R": "Tornozelo Direito",
-  // Pés (L/R)
   "19_Feet": "Pés", "19_Feet_L": "Pé Esquerdo", "19_Feet_R": "Pé Direito",
   "19_Foot_L": "Pé Esquerdo", "19_Foot_R": "Pé Direito",
-  // Orelhas (L/R)
   "SA_03_EARS": "Orelhas", "SA_03_EARS_L": "Orelha Esquerda", "SA_03_EARS_R": "Orelha Direita",
   "SA_03_EAR_L": "Orelha Esquerda", "SA_03_EAR_R": "Orelha Direita",
 };
 
-/** Meshes combinados: quando o modelo tem 1 mesh para ambos os lados, resolve por posição X (positivo = direito) */
+/** Meshes bilaterais numa só geometria: partição por X local (+X → direito). */
 const COMBINED_PARTS: Record<string, { left: string; right: string }> = {
   "04_Shoulders": { left: "Ombro Esquerdo", right: "Ombro Direito" },
   "10_Upper_arms": { left: "Braço Esquerdo", right: "Braço Direito" },
@@ -121,8 +109,6 @@ export default function AnatomicMapper() {
   ) => {
     setIsAnimating(true);
 
-    // Google Earth-style framing: distance based on bbox to fit the whole part in view
-    // FOV ~50° → visible width at distance d ≈ 2*d*tan(25°) ≈ 0.93*d
     const FOV_FACTOR = 0.48;
     const width = bboxSize ? Math.max(bboxSize.x, bboxSize.z) : meshSize ?? 0.5;
     const height = bboxSize?.y ?? meshSize ?? 0.5;
@@ -132,7 +118,6 @@ export default function AnatomicMapper() {
     const cameraOffset = direction.clone().multiplyScalar(baseDist);
     cameraOffset.y += 0.03;
 
-    // Lateral offset for arms/extended limbs: shift camera to the side of the part
     const lateralBias = 0.45;
     if (Math.abs(center.x) > 0.08) {
       cameraOffset.x += Math.sign(center.x) * lateralBias;
@@ -146,7 +131,6 @@ export default function AnatomicMapper() {
     const newCircle: CircleData = { position, normal, radius: 0.01, meshName, zoneName };
     setCircles((prev) => [...prev, newCircle]);
     setActiveCircleIndex(circles.length);
-    // Disable orbit controls during drag
     if (orbitRef.current) orbitRef.current.enabled = false;
   }, [circles.length]);
 
@@ -188,9 +172,7 @@ export default function AnatomicMapper() {
       </div>
 
       <div className="flex h-[calc(100vh-200px)] overflow-hidden rounded-xl bg-card shadow-soft border border-border">
-        {/* Left: Map */}
         <div className="w-3/5 relative border-r border-border" style={{ background: "linear-gradient(145deg, #64748b 0%, #475569 50%, #334155 100%)" }}>
-          {/* Controls */}
           <div className="absolute top-4 left-4 z-10 flex items-center gap-2">
             <div className="flex items-center gap-3 bg-card p-2 px-3 rounded-lg shadow-surface border border-border">
               <span className={`text-xs font-medium ${!is3D ? "text-primary" : "text-muted-foreground"}`}>Lista</span>
@@ -205,7 +187,6 @@ export default function AnatomicMapper() {
             )}
           </div>
 
-          {/* Status */}
           {is3D && (
             <div className="absolute bottom-4 left-4 z-10">
               <div className="bg-card/90 backdrop-blur-sm px-3 py-2 rounded-lg shadow-surface border border-border">
@@ -287,7 +268,6 @@ export default function AnatomicMapper() {
           )}
         </div>
 
-        {/* Right: Action Panel */}
         <div className="w-2/5 p-6 flex flex-col bg-card overflow-y-auto">
           <header className="mb-4">
             <h2 className="text-lg font-semibold text-foreground">Registro de Lesão</h2>
@@ -296,7 +276,6 @@ export default function AnatomicMapper() {
             </p>
           </header>
 
-          {/* Circles list */}
           {circles.length > 0 && (
             <div className="mb-4 space-y-1.5">
               <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">

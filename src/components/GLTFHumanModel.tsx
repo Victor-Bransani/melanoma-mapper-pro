@@ -16,11 +16,7 @@ export interface CircleData {
 
 export type CombinedPartsMap = Record<string, { left: string; right: string }>;
 
-/**
- * Divide BufferGeometry pelo plano x=planeX (em espaço local).
- * Triângulos com centroid.x >= planeX → geomA, centroid.x < planeX → geomB.
- * flipLeftRight: true = geomA é direito (_R), geomB é esquerdo (_L).
- */
+/** Partição de triângulos por plano X local; `flipLeftRight` troca a atribuição L/R. */
 function splitGeometryByPlaneX(
   geometry: THREE.BufferGeometry,
   planeX: number,
@@ -137,7 +133,7 @@ interface GLTFHumanModelProps {
   onResizeCircle?: (radius: number) => void;
   onFinishCircle?: () => void;
   onMeshCenterFound?: (center: THREE.Vector3, meshName: string, direction: THREE.Vector3, meshSize?: number, bboxSize?: THREE.Vector3) => void;
-  /** Se true, inverte L/R (para modelos com convenção oposta ao glTF) */
+  /** Inverte qual metade da partição X vira malha _L vs _R. */
   flipLeftRightAxis?: boolean;
 }
 
@@ -172,7 +168,6 @@ export function GLTFHumanModel({
 
   const originalMaterials = useRef<Map<string, THREE.Material | THREE.Material[]>>(new Map());
 
-  /** Nome de exibição (meshNameMap direto; meshes divididos já têm _L/_R). */
   const getDisplayName = useCallback(
     (meshName: string, _point?: THREE.Vector3) => meshNameMap[meshName] || meshName,
     [meshNameMap]
@@ -223,8 +218,6 @@ export function GLTFHumanModel({
       }
     });
 
-    // Divide meshes combinados em geometrias L e R (split por triângulos, sem clipping)
-    // Evita sobreposição: cada triângulo vai para apenas uma malha
     for (const mesh of toSplit) {
       const baseName = mesh.name;
       const parent = mesh.parent;
@@ -288,8 +281,6 @@ export function GLTFHumanModel({
     const size = combinedBox.getSize(new THREE.Vector3());
     const meshSize = Math.max(size.x, size.y, size.z);
 
-    // Direction: câmera fica fora da região, olhando para ela
-    // glTF: +Z = frente. Partes traseiras (Costas, Lombar, Glúteos) → câmera atrás. Demais → frente.
     const BACK_ZONES = ["Costas", "Dorso Superior", "Dorso Inferior", "Lombar", "Glúteos"];
     const isBackZone = BACK_ZONES.includes(selectedZone);
 
@@ -304,7 +295,6 @@ export function GLTFHumanModel({
       dir.set(0, 0, isBackZone ? -1 : 1);
     } else {
       dir.normalize();
-      // Coxa, pernas etc.: centro pode estar atrás (z<0). Forçar câmera na frente.
       if (!isBackZone && dir.z < 0) {
         dir.set(dir.x, 0, Math.abs(dir.z) || 0.3);
         dir.normalize();
@@ -312,7 +302,7 @@ export function GLTFHumanModel({
     }
 
     onMeshCenterFound(center, meshName, dir, meshSize, size);
-  }, [selectedZone, modelScene, reverseMap, getDisplayName, combinedParts, onMeshCenterFound]);
+  }, [selectedZone, modelScene, reverseMap, getDisplayName, onMeshCenterFound]);
 
   useEffect(() => {
     if (!modelScene) return;
@@ -361,7 +351,6 @@ export function GLTFHumanModel({
       isDragging.current = true;
       dragOrigin.current = e.point.clone();
       const normal = e.face?.normal.clone() || new THREE.Vector3(0, 1, 0);
-      // Transform normal to world space
       const normalMatrix = new THREE.Matrix3().getNormalMatrix(mesh.matrixWorld);
       normal.applyMatrix3(normalMatrix).normalize();
       onStartCircle(e.point.clone(), normal, mesh.name, displayName);
@@ -401,7 +390,6 @@ export function GLTFHumanModel({
     if (!mesh.isMesh || !mesh.name) return;
     const displayName = getDisplayName(mesh.name, e.point);
 
-    // Only select zone if not in zoom mode (drag handles placement)
     if (!isZoomed || selectedZone !== displayName) {
       onSelectZone(displayName);
     }
@@ -427,7 +415,6 @@ export function GLTFHumanModel({
         onPointerOut={handlePointerOut}
       />
 
-      {/* Render circles */}
       {circles.map((circle, i) => (
         <CircleMarker
           key={i}
@@ -438,7 +425,6 @@ export function GLTFHumanModel({
         />
       ))}
 
-      {/* Hover tooltip */}
       {hoveredMesh && hoveredPosition && !isDragging.current && (
         <Html position={hoveredPosition} style={{ pointerEvents: "none" }}>
           <div
